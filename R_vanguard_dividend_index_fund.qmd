@@ -1,0 +1,109 @@
+---
+title: "Vanguard Dividend Appreciation Index Fund (VDADX)"
+# format: revealjs
+format: html
+editor: visual
+---
+
+This fund focuses on U.S. large-cap companies that have consistently increased dividends for at least 10 consecutive years, offering steady dividend income with a low expense ratio of 0.08%
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tidyquant)
+library(scales)
+library(plotly)
+library(lubridate)
+library(pracma)
+library(janitor)
+library(flextable)
+knitr::opts_chunk$set(echo = FALSE,message = FALSE)
+```
+
+```{r}
+rm(list=ls())
+funds <- tq_get("VDADX", gfunds = "stock.prices", from = " 2017-01-01")
+```
+
+```{r}
+# Rolling  Means for Closing Prices
+funds$shortest_mean <- movavg(funds$close,n=7, type=c("s"))
+funds$short_mean <- movavg(funds$close,n=20, type=c("s"))
+funds$medium_mean <- movavg(funds$close,n=50, type=c("s"))
+funds$long_mean <- movavg(funds$close,n=100, type=c("s"))
+```
+
+```{r}
+# Rolling Means for Volume
+funds$shortest_vol <- movavg(funds$volume,n=7, type=c("s"))
+funds$short_vol <- movavg(funds$volume,n=20, type=c("s"))
+funds$medium_vol <- movavg(funds$volume,n=50, type=c("s"))
+funds$long_vol <- movavg(funds$volume,n=100, type=c("s"))
+```
+
+# Summary Data
+
+```{r}
+# Create the summary of your selected columns
+funds %>%
+  select(close, short_mean, medium_mean, long_mean) %>%
+  summary()
+
+
+
+```
+
+# Plotting the Closing Prices with Moving Averages
+
+```{r}
+funds <- funds |> filter(date >= max(date) - 180)
+funds |> ggplot() + geom_line(aes(x=date,y=close,col="Close"),linewidth=1) +
+        geom_line(aes(x=date,y=long_mean,col="100 Day"),linewidth=1) + 
+        geom_line(aes(x=date,y=short_mean,col="20 Day"),linewidth=1) +
+           theme_light() +
+        labs(title ="Daily Close with 25/100 Day Rolling Mean") 
+```
+
+# Bollinger Bands
+
+```{r}
+
+# Step 2: Calculate the 20-day Simple Moving Average (SMA) and the standard deviation
+bollinger_bands <- funds  %>%
+  mutate(SMA20 = rollmean(close, 20, fill = NA, align = 'right'), 
+         stddev = rollapply(close, 20, sd, fill = NA, align = 'right')) %>%
+  
+  # Step 3: Calculate the Upper and Lower Bollinger Bands
+  mutate(upper_band = SMA20 + (2 * stddev),
+         lower_band = SMA20 - (2 * stddev))
+
+# Step 4: View the data with Bollinger Bands
+head(bollinger_bands)
+
+# Optional: Step 5 - Visualize the Bollinger Bands
+bb <- bollinger_bands %>% 
+  ggplot(aes(x = date, y = close)) +
+  geom_line(aes(y = close), color = "blue") +
+  geom_line(aes(y = SMA20), color = "red") +
+  geom_ribbon(aes(ymin = lower_band, ymax = upper_band), alpha = 0.2) +
+  labs(title = "Bollinger Bands",
+       x = "Date", y = "Price") +
+  theme_minimal()
+ggplotly(bb)
+```
+
+# Tidyquant Barchart
+
+```{r}
+funds %>%  filter(date >='2024-09-01') |>
+    ggplot(aes(x = date, y = close)) +
+    geom_barchart(aes(open = open, high = high, low = low, close = close)) +
+    geom_ma(color = "darkgreen" )
+    
+```
+
+```{r}
+funds %>% filter(date >='2024-09-01') |>
+    ggplot(aes(x = date, y = close)) +
+    geom_candlestick(aes(open = open, high = high, low = low, close = close)) +
+    geom_ma(color = "darkgreen" )
+```
